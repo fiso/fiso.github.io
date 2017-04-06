@@ -1,0 +1,9 @@
+#!/bin/bash
+IFS=$'\n';
+FOLDER=$(pwd)
+for f in $(find "$FOLDER/src/img" -name '*.jpg')
+do
+	echo "Guetzling file - $f..."
+	guetzli -quality 84 -verbose "$f" "$f"
+	echo "Done."
+done

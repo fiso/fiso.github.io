@@ -1,6 +1,8 @@
 .DS_Store
 yarn.lock
 node_modules/
-**/*.log
 shrinkwrap.yaml
 **/*.map
+build/
+**/*.log
+shrinkwrap.yaml

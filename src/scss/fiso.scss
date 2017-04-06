@@ -1,0 +1,72 @@
+@import "variables";
+@import "fonts";
+@import "mixins";
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+a {
+  text-decoration: none;
+}
+
+h1 {
+  font-size: $base-font-size;
+  font-weight: normal;
+}
+
+p {
+  line-height: $base-line-height;
+}
+
+.appear {
+  opacity: 0;
+  transition: 900ms opacity ease-in-out, 900ms transform ease-in-out;
+
+  &.appearing {
+    opacity: 1;
+  }
+}
+
+img {
+  &[data-src] {
+    opacity: 0;
+    transition: 900ms opacity ease-in-out;
+
+    &.loaded {
+      opacity: 1;
+    }
+  }
+}
+
+button {
+  background-color: $dark-gray;
+  border: 0;
+  outline: none;
+  cursor: pointer;
+  transition: transform 900ms 500ms ease-in-out, opacity 900ms 500ms ease-in-out;
+}
+
+body {
+  min-height: 100vh;
+  overflow-x: hidden;
+  color: $black;
+  font-size: $base-font-size;
+
+  > header {
+  }
+}
+
+header {
+
+}
+
+footer {
+
+}
+
+section {
+
+}
