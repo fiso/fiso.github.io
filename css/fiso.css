@@ -1,0 +1,57 @@
+@import url("//fonts.googleapis.com/css?family=Raleway:200,400");
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0; }
+
+a {
+  text-decoration: none; }
+
+h1 {
+  font-size: 30px;
+  font-weight: normal; }
+
+p {
+  line-height: 28px; }
+
+.appear {
+  opacity: 0;
+  transition: 900ms opacity ease-in-out, 900ms transform ease-in-out; }
+  .appear.appearing {
+    opacity: 1; }
+
+img[data-src] {
+  opacity: 0;
+  transition: 900ms opacity ease-in-out; }
+  img[data-src].loaded {
+    opacity: 1; }
+
+button {
+  background-color: #3b3b3b;
+  border: 0;
+  outline: none;
+  cursor: pointer;
+  transition: transform 900ms 500ms ease-in-out, opacity 900ms 500ms ease-in-out; }
+
+body {
+  min-height: 100vh;
+  overflow-x: hidden;
+  color: #000;
+  font-size: 30px;
+  font-family: "Raleway", sans-serif;
+  padding-top: 50px; }
+  body > footer,
+  body > header {
+    padding: 10px; }
+  body > header {
+    position: fixed;
+    top: 0;
+    width: 100%;
+    background-color: #000;
+    height: 50px; }
+  body > footer {
+    min-height: 100px; }
+  body > section {
+    margin-bottom: 100px; }
+
+/*# sourceMappingURL=fiso.css.map */
