@@ -12,8 +12,12 @@ const fiso = {
     }, 25);
   },
 
+  scrollTop: -1,
   scrollHandler: function (e) {
+    this.scrollTop = this.getScrollElement().scrollTop;
     this.updateAppear();
+    this.updateTimeline();
+    lazyImages.updateImages();
   },
 
   resizeThrottler: function (e) {
@@ -62,6 +66,18 @@ const fiso = {
     );
   },
 
+  maxTimelineOffset: -1,
+  updateTimeline: function () {
+    const timelineScroller = this.querySelectorCached(".timeline ul");
+    if (this.maxTimelineOffset === -1) {
+      const timeline = this.querySelectorCached(".timeline");
+      this.maxTimelineOffset = timelineScroller.offsetHeight -
+        timeline.offsetHeight;
+    }
+    const offset = Math.min(this.scrollTop * 0.8, this.maxTimelineOffset);
+    timelineScroller.style.transform = `translateY(${-offset}px)`;
+  },
+
   appearCache: {},
   updateAppear: function () {
     const appearElements = this.querySelectorAllCached(".appear");
@@ -75,6 +91,7 @@ const fiso = {
       }
       this.appearCache[i] = true;
       el.addEventListener("transitionend", (e) => {
+        el.classList.remove("appearing");
         el.classList.add("appeared");
       });
       el.classList.add("appearing");
@@ -130,11 +147,18 @@ const fiso = {
   setupListeners: function () {
     window.addEventListener("scroll", this.scrollThrottler.bind(this));
     window.addEventListener("resize", this.resizeThrottler.bind(this));
-    setTimeout(this.scrollHandler.bind(this), 10);
+    this.scrollHandler();
   },
 
   init: function () {
     this.setupListeners();
+    this.querySelectorCached(".hero .alternate").classList.add("intro");
+    this.querySelectorAllCached(".progressbar").forEach((el) => {
+      const value = Number(el.dataset.progress);
+      const blocker = document.createElement("span");
+      el.appendChild(blocker);
+      blocker.style.width = `${100 - value}%`;
+    });
   },
 };
 
