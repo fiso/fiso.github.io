@@ -12,7 +12,7 @@
     "js-watch": "mkdir -p build/js && babel --watch --source-maps --presets es2015 src/js/*.js src/js/**/*.js -o build/js/fiso.bundle.js",
     "scss": "node-sass src/scss/ -o build/css && postcss --use autoprefixer -r ./build/css/*.css && minify --template {{filename}}.{{ext}} build/css/",
     "scss-watch": "npm run scss && node-sass -w --source-map true src/scss/ -o build/css",
-    "assets": "cp -R src/assets/* build/",
+    "assets": "cp -R src/assets/* build/ && cp src/index.html build",
     "assets-watch": "npm run assets && onchange 'src/assets/**/*' -v -- npm run assets",
     "guetzli": "find src/img/ -name '*.jpg' -type f -exec guetzli --verbose {} {} \\;",
     "jpgoptimize": "find build/img/ -name '*.jpg' -type f -exec jpegtran -copy none -optimize -progressive -outfile {} {} \\;",

@@ -1,2 +1,0 @@
-#!/bin/bash
-find . -name '*.jpg' -type f -exec convert {} -resize 1280x1280 {} \;
