@@ -16,6 +16,7 @@ const fiso = {
   scrollHandler: function (e) {
     this.scrollTop = this.getScrollElement().scrollTop;
     this.updateAppear();
+    this.updateParallax();
     this.updateTimeline();
     lazyImages.updateImages();
   },
@@ -66,16 +67,38 @@ const fiso = {
     );
   },
 
-  maxTimelineOffset: -1,
   updateTimeline: function () {
     const timelineScroller = this.querySelectorCached(".timeline ul");
-    if (this.maxTimelineOffset === -1) {
-      const timeline = this.querySelectorCached(".timeline");
-      this.maxTimelineOffset = timelineScroller.offsetHeight -
-        timeline.offsetHeight;
-    }
-    const offset = Math.min(this.scrollTop * 0.8, this.maxTimelineOffset);
+    const timeline = this.querySelectorCached(".timeline");
+    const maxOffset = timelineScroller.offsetHeight -
+      timeline.offsetHeight;
+    const startScrollTop = timeline.offsetParent.offsetTop -
+      window.innerHeight * 0.3;
+    const endScrollTop = timeline.offsetParent.offsetTop +
+      timeline.offsetHeight - window.innerHeight;
+    const fraction = Math.max(Math.min((this.scrollTop - startScrollTop) /
+      (endScrollTop - startScrollTop), 1), 0);
+    const offset = maxOffset * fraction;
+    timelineScroller.style.willChange = "transform";
     timelineScroller.style.transform = `translateY(${-offset}px)`;
+
+    if (this.timelineTimeout) {
+      clearTimeout(this.timelineTimeout);
+    }
+    this.timelineTimeout = setTimeout(() => {
+      this.timelineTimeout = null;
+      timelineScroller.style.willChange = "";
+    }, 200);
+  },
+
+  setVendorStyle: function (element, property, value) {
+    element.style["webkit" + property] = value;
+    element.style["moz" + property] = value;
+    element.style["ms" + property] = value;
+    element.style["o" + property] = value;
+  },
+
+  updateParallax: function () {
   },
 
   appearCache: {},
@@ -95,6 +118,9 @@ const fiso = {
         el.classList.add("appeared");
       });
       el.classList.add("appearing");
+      if (el.classList.contains("appear-notify")) {
+        el.dispatchEvent(new Event("appeared"));
+      }
     }
   },
 
@@ -144,21 +170,84 @@ const fiso = {
     return header.offsetHeight;
   },
 
+  showModal: function (title, image, body) {
+    const modal = this.querySelectorCached(".modal");
+    const h2 = this.querySelectorCached(".modal h2");
+    const img = this.querySelectorCached(".modal img");
+    const p = this.querySelectorCached(".modal p");
+    h2.innerHTML = title || "";
+    if (image) {
+      img.src = image;
+      img.style.display = "block";
+    } else {
+      img.style.display = "none";
+    }
+    p.innerHTML = body || "";
+    modal.classList.add("visible");
+
+    const clickHandler = (event) => {
+      if (!modal.contains(event.target)) {
+        this.hideModal();
+        document.removeEventListener("click", clickHandler);
+      }
+    };
+
+    document.addEventListener("click", clickHandler);
+  },
+
+  hideModal: function () {
+    const modal = this.querySelectorCached(".modal");
+    modal.classList.remove("visible");
+  },
+
+  showInfobox: function (name) {
+    /* eslint-disable */
+    const info = {
+      birth: {title: "I was born in 1980", image: "", body: "This was a big deal for me."},
+      cbm: {title: "In 1987, I got a C64 for Christmas", image: "", body: "I didn't know it at the time, but it would be a formative moment for me."},
+      amiga: {title: "", image: "", body: ""},
+      c: {title: "", image: "", body: ""},
+      threed: {title: "", image: "", body: ""},
+      amuze: {title: "", image: "", body: ""},
+      uds: {title: "", image: "", body: ""},
+      esn: {title: "", image: "", body: ""},
+      ea: {title: "", image: "", body: ""},
+      ludvig: {title: "", image: "", body: ""},
+      happypie: {title: "", image: "", body: ""},
+    };
+    /* eslint-enable */
+
+    if (!info[name]) {
+      return;
+    }
+
+    this.showModal(info[name].title, info[name].image, info[name].body);
+  },
+
   setupListeners: function () {
     window.addEventListener("scroll", this.scrollThrottler.bind(this));
     window.addEventListener("resize", this.resizeThrottler.bind(this));
-    this.scrollHandler();
+
+    this.querySelectorAllCached(".timeline a").forEach((element) => {
+      element.addEventListener("click", (event) => {
+        event.stopPropagation();
+        this.showInfobox(element.dataset.infobox);
+      });
+    });
   },
 
   init: function () {
     this.setupListeners();
-    this.querySelectorCached(".hero .alternate").classList.add("intro");
     this.querySelectorAllCached(".progressbar").forEach((el) => {
       const value = Number(el.dataset.progress);
       const blocker = document.createElement("span");
       el.appendChild(blocker);
-      blocker.style.width = `${100 - value}%`;
+      el.addEventListener("appeared", (e) => {
+        blocker.style.width = `${100 - value}%`;
+      });
     });
+
+    setTimeout(this.scrollHandler.bind(this), 100);
   },
 };
 

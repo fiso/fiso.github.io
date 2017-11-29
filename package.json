@@ -4,7 +4,7 @@
   "description": "fiso.github.io",
   "main": "index.js",
   "scripts": {
-    "dev": "parallelshell 'npm run watch' 'npm run devserver > /dev/null' 2>&1 >/dev/null | node scripts/errorwatcher.js",
+    "dev": "parallelshell 'npm run watch' 'npm run devserver > /dev/null' 2>&1 >/dev/null",
     "devserver": "cd build && httpserver 8080",
     "watch": "parallelshell 'npm run js-watch' 'npm run scss-watch' 'npm run assets-watch'",
     "build": "npm run js && npm run scss && npm run assets && npm run jpgoptimize && npm run pngoptimize && npm run zip",
@@ -37,9 +37,12 @@
     "minifier": "^0.8.1",
     "node-sass": "^4.5.0",
     "onchange": "^3.2.1",
-    "parallelshell": "^2.0.0",
     "pngquant": "^1.2.0",
     "postcss-cli": "^3.0.0-beta",
     "replace": "^0.3.0"
+  },
+  "dependencies": {
+    "parallelshell": "^3.0.2",
+    "sass-lint": "^1.12.1"
   }
 }
