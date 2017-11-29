@@ -16,8 +16,13 @@ var fiso = {
     }, 25);
   },
 
+  scrollTop: -1,
   scrollHandler: function scrollHandler(e) {
+    this.scrollTop = this.getScrollElement().scrollTop;
     this.updateAppear();
+    this.updateParallax();
+    this.updateTimeline();
+    lazyImages.updateImages();
   },
 
   resizeThrottler: function resizeThrottler(e) {
@@ -63,25 +68,60 @@ var fiso = {
     return rect.bottom + bufferZone >= 0 && rect.top - bufferZone <= (window.innerHeight || document.documentElement.clientHeight);
   },
 
+  updateTimeline: function updateTimeline() {
+    var _this3 = this;
+
+    var timelineScroller = this.querySelectorCached(".timeline ul");
+    var timeline = this.querySelectorCached(".timeline");
+    var maxOffset = timelineScroller.offsetHeight - timeline.offsetHeight;
+    var startScrollTop = timeline.offsetParent.offsetTop - window.innerHeight * 0.3;
+    var endScrollTop = timeline.offsetParent.offsetTop + timeline.offsetHeight - window.innerHeight;
+    var fraction = Math.max(Math.min((this.scrollTop - startScrollTop) / (endScrollTop - startScrollTop), 1), 0);
+    var offset = maxOffset * fraction;
+    timelineScroller.style.willChange = "transform";
+    timelineScroller.style.transform = "translateY(" + -offset + "px)";
+
+    if (this.timelineTimeout) {
+      clearTimeout(this.timelineTimeout);
+    }
+    this.timelineTimeout = setTimeout(function () {
+      _this3.timelineTimeout = null;
+      timelineScroller.style.willChange = "";
+    }, 200);
+  },
+
+  setVendorStyle: function setVendorStyle(element, property, value) {
+    element.style["webkit" + property] = value;
+    element.style["moz" + property] = value;
+    element.style["ms" + property] = value;
+    element.style["o" + property] = value;
+  },
+
+  updateParallax: function updateParallax() {},
+
   appearCache: {},
   updateAppear: function updateAppear() {
-    var _this3 = this;
+    var _this4 = this;
 
     var appearElements = this.querySelectorAllCached(".appear");
 
     var _loop = function _loop(i) {
-      if (_this3.appearCache[i]) {
+      if (_this4.appearCache[i]) {
         return "continue";
       }
       var el = appearElements[i];
-      if (!_this3.elementInView(el)) {
+      if (!_this4.elementInView(el)) {
         return "continue";
       }
-      _this3.appearCache[i] = true;
+      _this4.appearCache[i] = true;
       el.addEventListener("transitionend", function (e) {
+        el.classList.remove("appearing");
         el.classList.add("appeared");
       });
       el.classList.add("appearing");
+      if (el.classList.contains("appear-notify")) {
+        el.dispatchEvent(new Event("appeared"));
+      }
     };
 
     for (var i = 0; i < appearElements.length; i++) {
@@ -135,14 +175,88 @@ var fiso = {
     return header.offsetHeight;
   },
 
+  showModal: function showModal(title, image, body) {
+    var _this5 = this;
+
+    var modal = this.querySelectorCached(".modal");
+    var h2 = this.querySelectorCached(".modal h2");
+    var img = this.querySelectorCached(".modal img");
+    var p = this.querySelectorCached(".modal p");
+    h2.innerHTML = title || "";
+    if (image) {
+      img.src = image;
+      img.style.display = "block";
+    } else {
+      img.style.display = "none";
+    }
+    p.innerHTML = body || "";
+    modal.classList.add("visible");
+
+    var clickHandler = function clickHandler(event) {
+      if (!modal.contains(event.target)) {
+        _this5.hideModal();
+        document.removeEventListener("click", clickHandler);
+      }
+    };
+
+    document.addEventListener("click", clickHandler);
+  },
+
+  hideModal: function hideModal() {
+    var modal = this.querySelectorCached(".modal");
+    modal.classList.remove("visible");
+  },
+
+  showInfobox: function showInfobox(name) {
+    /* eslint-disable */
+    var info = {
+      birth: { title: "I was born in 1980", image: "", body: "This was a big deal for me." },
+      cbm: { title: "In 1987, I got a C64 for Christmas", image: "", body: "I didn't know it at the time, but it would be a formative moment for me." },
+      amiga: { title: "", image: "", body: "" },
+      c: { title: "", image: "", body: "" },
+      threed: { title: "", image: "", body: "" },
+      amuze: { title: "", image: "", body: "" },
+      uds: { title: "", image: "", body: "" },
+      esn: { title: "", image: "", body: "" },
+      ea: { title: "", image: "", body: "" },
+      ludvig: { title: "", image: "", body: "" },
+      happypie: { title: "", image: "", body: "" }
+    };
+    /* eslint-enable */
+
+    if (!info[name]) {
+      return;
+    }
+
+    this.showModal(info[name].title, info[name].image, info[name].body);
+  },
+
   setupListeners: function setupListeners() {
+    var _this6 = this;
+
     window.addEventListener("scroll", this.scrollThrottler.bind(this));
     window.addEventListener("resize", this.resizeThrottler.bind(this));
-    setTimeout(this.scrollHandler.bind(this), 10);
+
+    this.querySelectorAllCached(".timeline a").forEach(function (element) {
+      element.addEventListener("click", function (event) {
+        event.stopPropagation();
+        _this6.showInfobox(element.dataset.infobox);
+      });
+    });
   },
 
   init: function init() {
     this.setupListeners();
+    this.querySelectorAllCached(".progressbar").forEach(function (el) {
+      var value = Number(el.dataset.progress);
+      var blocker = document.createElement("span");
+      el.appendChild(blocker);
+      el.addEventListener("appeared", function (e) {
+        blocker.style.width = 100 - value + "%";
+      });
+    });
+
+    setTimeout(this.scrollHandler.bind(this), 100);
   }
 };
 
@@ -159,819 +273,64 @@ documentReady(function () {
 });
 "use strict";
 
-var HappyAnimation = {
-  parallaxCache: {},
-  updateParallax: function updateParallax() {
-    var parallaxElements = HappyNellyUtils.querySelectorAllCached("." + HappyNellyUtils.rootClassName + " .parallax");
-    for (var i = 0; i < parallaxElements.length; i++) {
-      var el = parallaxElements[i];
-      if (!HappyNellyUtils.elementInView(el, 100 * window.devicePixelRatio)) {
-        if (el.style.willChange) {
-          el.style.willChange = "";
-        }
-        continue;
-      }
-      el.style.willChange = "transform";
-      if (!HappyAnimation.parallaxCache[i]) {
-        HappyAnimation.parallaxCache[i] = el.dataset.parallaxStrength;
-      }
-      var strength = (HappyAnimation.parallaxCache[i] || 200) / window.devicePixelRatio;
-      var elementBounds = el.getBoundingClientRect();
-      var elementCenter = elementBounds.top + elementBounds.height / 2;
-      var position = (window.innerHeight - elementBounds.top) / (window.innerHeight + elementBounds.height);
-      HappyNellyUtils.setVendorStyle(el, "Transform", "translateY(" + (-(strength * 0.5) + position * strength) + "px)");
-    }
+var lazyImages = {
+  _lazyCache: {},
+  _lazyCacheList: [],
+  _imgElements: null,
+  _allLoaded: false,
+
+  _removeEventListeners: function _removeEventListeners(el) {
+    el.removeEventListener("load", lazyImages._onLoad);
+    el.removeEventListener("error", lazyImages._onError);
   },
 
-  appearCache: {},
-  updateAppear: function updateAppear() {
-    var appearElements = HappyNellyUtils.querySelectorAllCached("." + HappyNellyUtils.rootClassName + " .appear");
-    for (var i = 0; i < appearElements.length; i++) {
-      if (HappyAnimation.appearCache[i]) {
-        continue;
-      }
-      var el = appearElements[i];
-      if (!HappyNellyUtils.elementInView(el)) {
-        continue;
-      }
-      HappyAnimation.appearCache[i] = true;
-      el.classList.add("appeared");
-    }
-  }
-};
-"use strict";
-
-var HappyCarousel = {
-  touches: {
-    touchstart: { x: -1, y: -1 },
-    touchmove: { x: -1, y: -1 },
-    touchend: false,
-    direction: "undetermined"
+  _onLoad: function _onLoad(e) {
+    this.classList.remove("loading");
+    this.classList.add("loaded");
+    lazyImages._removeEventListeners(this);
   },
 
-  handleTouches: function handleTouches(carouselIndex, event) {
-    if (typeof event === "undefined") {
-      return;
-    }
-    if (typeof event.touches === "undefined") {
-      return;
-    }
-
-    var touch = event.touches[0];
-
-    switch (event.type) {
-      case "touchstart":
-      case "touchmove":
-        this.touches[event.type].x = touch.pageX;
-        this.touches[event.type].y = touch.pageY;
-        break;
-      case "touchend":
-        this.touches[event.type] = true;
-        var x = this.touches.touchstart.x - this.touches.touchmove.x;
-        var y = this.touches.touchstart.y - this.touches.touchmove.y;
-        if (x < 0) {
-          x /= -1;
-        }
-        if (y < 0) {
-          y /= -1;
-        }
-        if (x > y) {
-          this.touches.direction = this.touches.touchstart.x < this.touches.touchmove.x ? "right" : "left";
-        } else {
-          this.touches.direction = this.touches.touchstart.y < this.touches.touchmove.y ? "down" : "up";
-        }
-
-        switch (this.touches.direction) {
-          case "left":
-          case "right":
-            this.moveCarousel(this.touches.direction === "left" ? 1 : -1, carouselIndex);
-            break;
-          default:
-        }
-
-        break;
-      default:
-    }
+  _onError: function _onError(e) {
+    this.classList.remove("loading");
+    this.classList.add("error");
+    lazyImages._removeEventListeners(this);
   },
 
-  blockCarouselNavigation: false,
-  onCarouselArrowClick: function onCarouselArrowClick(arrowDirection, carouselIndex, e) {
-    // Animate arrow
-    var arrowContainer = e.target.closest(".arrow-container");
-    if (!arrowContainer) {
-      if (e.target.classList.contains("left-fader")) {
-        arrowContainer = e.target.closest(".happy-carousel").querySelector(".arrow-container.left");
-      } else if (e.target.classList.contains("right-fader")) {
-        arrowContainer = e.target.closest(".happy-carousel").querySelector(".arrow-container.right");
-      }
-    }
-    if (arrowContainer) {
-      arrowContainer.style.willChange = "transform";
-      HappyNellyUtils.setVendorStyle(arrowContainer, "Transform", "translateX(" + arrowDirection * 0.5 + "em)");
-
-      setTimeout(function () {
-        HappyNellyUtils.setVendorStyle(arrowContainer, "Transform", "");
-        arrowContainer.style.willChange = "";
-      }, 100);
-    }
-
-    this.moveCarousel(arrowDirection, carouselIndex);
-  },
-
-  moveCarousel: function moveCarousel(arrowDirection, carouselIndex) {
-    if (this.blockCarouselNavigation) {
-      return;
-    }
-
-    this.blockCarouselNavigation = true;
-
-    var carousels = HappyNellyUtils.querySelectorAllCached("." + this.rootClassName + " .happy-carousel");
-    var carousel = carousels[carouselIndex];
-    var slider = carousel.querySelector(".carousel-slider");
-    var products = slider.children;
-    var productWidth = products[0].offsetWidth;
-    var currentOffset = 0;
-    if (slider.style.transform) {
-      currentOffset = -Number(slider.style.transform.replace(/\D/g, ""));
-    }
-    var maxOffset = 0;
-    var productsWidth = products.length * productWidth;
-    var minOffset = slider.offsetWidth - productsWidth;
-    var newOffset = Math.round(currentOffset - productWidth * arrowDirection);
-    var center = Math.round(productsWidth / 2);
-    slider.style.willChange = "transform";
-    var performAdjustment = false;
-    var adjustTo = 0;
-    if (newOffset < minOffset) {
-      newOffset += center;
-      performAdjustment = true;
-      if (HappyNellyUtils.isMobile()) {
-        adjustTo = slider.offsetWidth / 2 - productWidth / 2 - productsWidth / 2 + 2 * productWidth;
-      } else {
-        adjustTo = slider.offsetWidth - center;
-      }
-    } else if (newOffset > maxOffset) {
-      newOffset -= center;
-      performAdjustment = true;
-      if (HappyNellyUtils.isMobile()) {
-        adjustTo = slider.offsetWidth / 2 - productWidth / 2 - productsWidth / 2 - productWidth;
-      } else {
-        adjustTo = -center;
-      }
-    }
-
-    var transition = "transform 300ms ease-in-out";
-
-    if (performAdjustment) {
-      slider.style.transition = "";
-      HappyNellyUtils.setVendorStyle(slider, "Transform", "translateX(" + Math.round(adjustTo) + "px)");
-      slider.offsetWidth; // Force reflow
-    }
-
-    var self = this; // Wow, this old pattern
-    slider.addEventListener("transitionend", function onEnd(e) {
-      slider.removeEventListener("transitionend", onEnd);
-      self.blockCarouselNavigation = false;
-    });
-
-    slider.style.transition = transition;
-    HappyNellyUtils.setVendorStyle(slider, "Transform", "translateX(" + newOffset + "px)");
-    setTimeout(function () {
-      slider.style.willChange = "";
-    }, 500);
-  },
-
-  init: function init(rootClassName, mobileBreak) {
-    var _this = this;
-
-    this.mobileBreak = mobileBreak || 767;
-    this.rootClassName = rootClassName;
-    var arrows = HappyNellyUtils.querySelectorAllCached("." + this.rootClassName + " .happy-carousel .arrow-container");
-
-    for (var i = 0; i < arrows.length; i++) {
-      var arrow = arrows[i];
-      arrow.addEventListener("click", this.onCarouselArrowClick.bind(this, Math.sign(i % 2 - 0.5), Math.floor(i / 2)));
-    }
-
-    var faders = HappyNellyUtils.querySelectorAllCached("." + this.rootClassName + " .happy-carousel .fader");
-
-    for (var _i = 0; _i < faders.length; _i++) {
-      var fader = faders[_i];
-      fader.addEventListener("click", this.onCarouselArrowClick.bind(this, Math.sign(_i % 2 - 0.5), Math.floor(_i / 2)));
-    }
-
-    var sliders = HappyNellyUtils.querySelectorAllCached("." + this.rootClassName + " .carousel-slider");
-
-    var _loop = function _loop(_i2) {
-      var slider = sliders[_i2];
-      var copy = slider.cloneNode(true);
-      while (copy.children.length) {
-        var productCopy = copy.children[0];
-        slider.insertBefore(productCopy, null);
-      }
-
-      var images = Array.prototype.slice.call(slider.querySelectorAll("img"));
-
-      var interval = setInterval(function () {
-        var imagesPending = Boolean(images.find(function (i) {
-          return !i.complete;
-        }));
-
-        if (!imagesPending) {
-          clearInterval(interval);
-
-          if (HappyNellyUtils.isMobile()) {
-            var products = slider.children;
-            var productWidth = products[0].offsetWidth;
-            var productsWidth = products.length * productWidth;
-            var center = productsWidth / 2;
-            var initialOffset = Math.round(slider.offsetWidth / 2 - productWidth / 2 - productsWidth / 2);
-            HappyNellyUtils.setVendorStyle(slider, "Transform", "translateX(" + initialOffset + "px)");
-          }
-
-          var carousels = HappyNellyUtils.querySelectorAllCached("." + _this.rootClassName + " .happy-carousel");
-
-          for (var _i3 = 0; _i3 < carousels.length; _i3++) {
-            var carousel = carousels[_i3];
-            carousel.addEventListener("touchstart", _this.handleTouches.bind(_this, _i3));
-            carousel.addEventListener("touchmove", _this.handleTouches.bind(_this, _i3));
-            carousel.addEventListener("touchend", _this.handleTouches.bind(_this, _i3));
-          }
-
-          slider.style.opacity = 1;
-        }
-      }, 100);
-    };
-
-    for (var _i2 = 0; _i2 < sliders.length; _i2++) {
-      _loop(_i2);
-    }
-  }
-};
-"use strict";
-
-var HappyLazyImages = {
-  lazyCache: {},
   updateImages: function updateImages() {
-    var imgElements = HappyNellyUtils.querySelectorAllCached("." + HappyNellyUtils.rootClassName + " img[data-src]");
-
-    var _loop = function _loop(i) {
-      if (HappyLazyImages.lazyCache[i]) {
-        return "continue";
-      }
-      var el = imgElements[i];
-      if (!HappyNellyUtils.elementInView(el)) {
-        return "continue";
-      }
-      HappyLazyImages.lazyCache[i] = true;
-      el.addEventListener("load", function (e) {
-        el.classList.add("loaded");
-      });
-      el.src = el.dataset.src;
-    };
-
-    for (var i = 0; i < imgElements.length; i++) {
-      var _ret = _loop(i);
-
-      if (_ret === "continue") continue;
-    }
-  }
-};
-"use strict";
-
-if (typeof require !== "undefined") {
-  HappyTemplate = require("./HappyTemplate.js");
-}
-
-var HappyMarkup = {
-  findNextOpeningTag: function findNextOpeningTag(src, tag, start) {
-    start = start || 0;
-
-    var tagStart = start;
-    for (tagStart = src.indexOf(tag, tagStart); tagStart !== -1; tagStart = src.indexOf(tag, tagStart)) {
-      var openingBracket = src.lastIndexOf("<", tagStart);
-      if (openingBracket === tagStart - 1) {
-        tagStart = openingBracket;
-        break;
-      }
-      var inbetween = src.substring(openingBracket, tagStart);
-      if (inbetween.trim().length < 1) {
-        break;
-      }
-      tagStart++;
+    if (lazyImages._allLoaded) {
+      return;
     }
 
-    return tagStart;
-  },
-
-  getAttributes: function getAttributes(tag) {
-    return tag.split(" ").reduce(function (attrs, str) {
-      if (str.indexOf("=") === -1) {
-        return attrs;
-      }
-
-      var key = str.substr(0, str.indexOf("=")).trim();
-      var value = str.substr(str.indexOf("=") + 1).trim();
-      var firstSingleQuote = value.indexOf("'");
-      var firstDoubleQuote = value.indexOf('"');
-      var quotationMark = '"';
-      var firstQuotationMark = firstDoubleQuote;
-      if (firstSingleQuote < firstDoubleQuote && firstSingleQuote !== -1) {
-        quotationMark = "'";
-        firstQuotationMark = firstSingleQuote;
-      }
-      value = value.substring(firstQuotationMark + 1, value.lastIndexOf(quotationMark));
-      attrs[key] = value;
-      return attrs;
-    }, {});
-  },
-
-  getNextElementOfType: function getNextElementOfType(rawSrc, tagName, start) {
-    start = start || 0;
-    var src = rawSrc.substring(start).toLocaleLowerCase();
-    var tag = tagName.toLocaleLowerCase();
-
-    var tagStart = HappyMarkup.findNextOpeningTag(src, tag);
-    if (tagStart === -1) {
-      return null;
-    }
-
-    var closer = src.indexOf(">", tagStart) + 1;
-    if (closer === 0) {
-      return null;
-    }
-    var attributes = HappyMarkup.getAttributes(rawSrc.substring(tagStart + start, closer + start));
-
-    var tagEnd = tagStart + 1;
-    var lastTagEnd = src.indexOf(tag, tagStart) + 1;
-    var closingTag = "</" + tag + ">";
-    for (tagEnd = src.indexOf(closingTag, tagEnd); tagEnd !== -1; tagEnd = src.indexOf(closingTag, tagEnd)) {
-      var nextOpeningTag = HappyMarkup.findNextOpeningTag(src, tag, lastTagEnd);
-      if (nextOpeningTag === -1) {
-        break;
-      }
-      if (nextOpeningTag > tagEnd) {
-        break;
-      }
-      lastTagEnd = tagEnd + closingTag.length;
-      tagEnd++;
-    }
-    if (tagEnd === -1) {
-      return null;
-    }
-
-    tagEnd = src.indexOf(">", tagEnd) + 1;
-
-    var block = {
-      start: tagStart + start,
-      end: tagEnd + start,
-      src: rawSrc.substring(tagStart + start, tagEnd + start),
-      attributes: attributes
-    };
-
-    block.getInnerMarkup = HappyMarkup._getInnerMarkup.bind(block);
-
-    return block;
-  },
-
-  // Must be called with a block object as scope
-  _getInnerMarkup: function _getInnerMarkup() {
-    return this.src.substring(this.src.indexOf(">") + 1, this.src.lastIndexOf("<"));
-  },
-
-  stripTagsWithAttrs: function stripTagsWithAttrs(src, tag, attrs) {
-    var start = 0;
-
-    var _loop = function _loop(block) {
-      var missingAttr = Object.keys(attrs).find(function (attr) {
-        return !Boolean(block.attributes[attr]);
-      });
-
-      if (missingAttr) {
-        console.log("Tag is missing attribute " + missingAttr);
-        start = block.end;
-        return "continue";
-      }
-      src = HappyTemplate._strSplice(src, block.start, block.end - block.start, "");
-    };
-
-    for (var block = HappyMarkup.getNextElementOfType(src, tag, start); block; block = HappyMarkup.getNextElementOfType(src, tag, start)) {
-      var _ret = _loop(block);
-
-      if (_ret === "continue") continue;
-    }
-
-    return src;
-  }
-};
-
-if (typeof module !== "undefined") {
-  module.exports = HappyMarkup;
-}
-"use strict";
-
-var HappyNellyUtils = {
-  mobileBreak: 767,
-  isMobile: function isMobile() {
-    return window.innerWidth <= HappyNellyUtils.mobileBreak;
-  },
-
-  querySelectorCache: {},
-  querySelectorAllCache: {},
-
-  querySelectorCached: function querySelectorCached(query) {
-    if (!HappyNellyUtils.querySelectorCache[query]) {
-      HappyNellyUtils.querySelectorCache[query] = document.querySelector(query);
-    }
-
-    return HappyNellyUtils.querySelectorCache[query];
-  },
-
-  querySelectorAllCached: function querySelectorAllCached(query) {
-    if (!HappyNellyUtils.querySelectorAllCache[query]) {
-      HappyNellyUtils.querySelectorAllCache[query] = Array.prototype.slice.call(document.querySelectorAll(query));
-    }
-
-    return HappyNellyUtils.querySelectorAllCache[query];
-  },
-
-  isIE: function isIE() {
-    var navigator = window.navigator;
-    return navigator.appName === "Microsoft Internet Explorer" || navigator.appName === "Netscape" && new RegExp("Trident/.*rv:([0-9]{1,}[\.0-9]{0,})").exec(navigator.userAgent) !== null;
-  },
-
-  isFirefox: function isFirefox() {
-    return window.navigator.userAgent.toLowerCase().indexOf("firefox") !== -1;
-  },
-
-  isSafari: function isSafari() {
-    return (/^((?!chrome|android).)*safari/i.test(navigator.userAgent)
-    );
-  },
-
-  isChrome: function isChrome() {
-    return (/Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor)
-    );
-  },
-
-  getScrollElement: function getScrollElement() {
-    return document.documentElement && document.documentElement.scrollTop ? document.documentElement : document.body;
-  },
-
-  getNellyHeaderHeight: function getNellyHeaderHeight() {
-    var nellyHeader = HappyNellyUtils.querySelectorCached(".navbar-menu");
-
-    if (!nellyHeader) {
-      nellyHeader = HappyNellyUtils.querySelectorCached(".navbar-fixed-top");
-    }
-
-    if (nellyHeader) {
-      return nellyHeader.getBoundingClientRect().bottom;
-    }
-
-    return 0;
-  },
-
-  countTo: function countTo(n, reverse) {
-    var ret = [];
-    for (var i = 0; i < n; i++) {
-      ret.push(i);
-    }
-    if (reverse) {
-      return ret.reverse();
-    }
-
-    return ret;
-  },
-
-  getClosest: function getClosest(value, a, b) {
-    if (Math.abs(value - a) < Math.abs(value - b)) {
-      return a;
-    }
-
-    return b;
-  },
-
-  clamp: function clamp(value, min, max) {
-    return Math.max(Math.min(value, max), min);
-  },
-
-  easeInOut: function easeInOut(currentTime, start, change, duration) {
-    currentTime /= duration / 2;
-    if (currentTime < 1) {
-      return change / 2 * currentTime * currentTime + start;
-    }
-
-    currentTime -= 1;
-    return -change / 2 * (currentTime * (currentTime - 2) - 1) + start;
-  },
-
-  scrollTo: function scrollTo(to, duration) {
-    var element = HappyNellyUtils.getScrollElement();
-    var start = element.scrollTop;
-    var change = to - start;
-    var increment = 20;
-
-    var animateScroll = function animateScroll(elapsedTime) {
-      elapsedTime += increment;
-      var position = HappyNellyUtils.easeInOut(elapsedTime, start, change, duration);
-      element.scrollTop = position;
-      if (elapsedTime < duration) {
-        setTimeout(function () {
-          animateScroll(elapsedTime);
-        }, increment);
-      }
-    };
-
-    animateScroll(0);
-  },
-
-  setVendorStyle: function setVendorStyle(element, property, value) {
-    element.style["webkit" + property] = value;
-    element.style["moz" + property] = value;
-    element.style["ms" + property] = value;
-    element.style["o" + property] = value;
-  },
-
-  handleFilterClick: function handleFilterClick(e) {
-    var rootClass = HappyNellyUtils.rootClassName;
-    var buttons = document.querySelectorAll("." + rootClass + " .filter-button");
-    for (var i = 0; i < buttons.length; i++) {
-      var btn = buttons[i];
-      btn.classList.remove("active");
-    }
-
-    var element = e.target;
-    element.classList.add("active");
-
-    var genderId = element.getAttribute("data-gender");
-    var campaignId = element.getAttribute("data-campaign");
-    var campaignInput = document.getElementById("paramCampaign");
-    var searchCodesInput = document.getElementById("search_codes");
-    if (campaignInput) {
-      campaignInput.value = campaignId;
-    }
-    if (searchCodesInput) {
-      searchCodesInput.value = genderId;
-    }
-
-    if (typeof filterSearch !== "undefined") {
-      filterSearch(true);
-    }
-
-    var navHeight = HappyNellyUtils.getNellyHeaderHeight();
-    var campaignElement = document.querySelector("." + rootClass);
-    var campaignHeight = campaignElement ? campaignElement.offsetHeight : 0;
-    var campaignTop = campaignElement ? campaignElement.offsetTop : 0;
-    HappyNellyUtils.scrollTo(campaignTop + campaignHeight - navHeight, 300);
-  },
-
-  elementInView: function elementInView(el, bufferZone) {
-    bufferZone = bufferZone || 0;
-    var rect = el.getBoundingClientRect();
-
-    return rect.bottom + bufferZone >= 0 && rect.top - bufferZone <= (window.innerHeight || document.documentElement.clientHeight);
-  },
-
-  init: function init(rootClassName, mobileBreak) {
-    HappyNellyUtils.mobileBreak = mobileBreak || 767;
-    HappyNellyUtils.rootClassName = rootClassName;
-
-    var campaignRoot = HappyNellyUtils.querySelectorCached("." + rootClassName);
-
-    if (HappyNellyUtils.isChrome()) {
-      campaignRoot.classList.add("browser-chrome");
-      campaignRoot.classList.add("browser-webkit");
-    }
-
-    if (HappyNellyUtils.isSafari()) {
-      campaignRoot.classList.add("browser-safari");
-      campaignRoot.classList.add("browser-webkit");
-    }
-
-    if (HappyNellyUtils.isFirefox()) {
-      campaignRoot.classList.add("browser-firefox");
-    }
-
-    if (HappyNellyUtils.isIE()) {
-      campaignRoot.classList.add("browser-ie");
-    }
-
-    var buttons = document.querySelectorAll("." + rootClassName + " .filter-button");
-    for (var i = 0; i < buttons.length; i++) {
-      var btn = buttons[i];
-      btn.addEventListener("click", HappyNellyUtils.handleFilterClick.bind(HappyNellyUtils));
-    }
-  }
-};
-"use strict";
-
-var _slicedToArray = function () { function sliceIterator(arr, i) { var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"]) _i["return"](); } finally { if (_d) throw _e; } } return _arr; } return function (arr, i) { if (Array.isArray(arr)) { return arr; } else if (Symbol.iterator in Object(arr)) { return sliceIterator(arr, i); } else { throw new TypeError("Invalid attempt to destructure non-iterable instance"); } }; }();
-
-var HappyTemplate = {
-  useDocument: function useDocument(documentObject) {
-    this.documentObject = documentObject || window.document;
-  },
-
-  _strSplice: function _strSplice(str, index, count, add) {
-    // We cannot pass negative indices dirrectly to the 2nd slicing operation.
-    if (index < 0) {
-      index = str.length + index;
-      if (index < 0) {
-        index = 0;
-      }
-    }
-
-    return str.slice(0, index) + (add || "") + str.slice(index + count);
-  },
-
-  _replaceAll: function _replaceAll(input, search, replacement) {
-    return input.replace(new RegExp(search, "g"), replacement);
-  },
-
-  _forEachExpression: function _forEachExpression(data, startDelimiter, endDelimiter, callback) {
-    for (var searchStart = data.indexOf(startDelimiter); searchStart !== -1; searchStart = data.indexOf(startDelimiter, searchStart)) {
-      var searchEnd = data.indexOf(endDelimiter, searchStart);
-      if (searchEnd === -1) {
-        console.error("Mismatched expression in template");
-        break;
-      }
-
-      searchStart += startDelimiter.length;
-
-      var expression = data.substring(searchStart, searchEnd);
-
-      var _callback = callback(expression, searchStart);
-
-      var _callback2 = _slicedToArray(_callback, 2);
-
-      data = _callback2[0];
-      searchStart = _callback2[1];
-    }
-  },
-
-  _compile: function _compile(source, context, _index) {
-    var _this = this;
-
-    var contextWithIndex = Object.assign({}, context, { _index: _index });
-
-    var expressionStart = "{{{";
-    var expressionEnd = "}}}";
-
-    // First process any nested templates
-    HappyTemplate._forEachExpression(source, expressionStart, expressionEnd, function (expression, start) {
-      // FIXME: Do some sanity checking here - verify we have all needed
-      // tokens in the correct order
-      var subTemplateId = expression.substring(0, expression.indexOf("(")).trim();
-      var subContextExpression = expression.substring(expression.indexOf("(") + 1, expression.indexOf(")")).trim();
-      var subContext = function (e) {
-        return eval(e);
-      }.call(contextWithIndex, subContextExpression);
-
-      var templateElement = _this.documentObject.getElementById(subTemplateId);
-      if (!templateElement) {
-        console.error("Invalid template id specified: " + subTemplateId);
-      } else {
-        var subTemplate = HappyTemplate._compile(templateElement.innerHTML, subContext);
-        source = source.replace("" + expressionStart + expression + expressionEnd, subTemplate);
-      }
-
-      return [source, start + expressionStart.length + expression.length + expressionEnd.length];
-    });
-
-    expressionStart = "{{";
-    expressionEnd = "}}";
-
-    // Then process all other expressions
-    HappyTemplate._forEachExpression(source, expressionStart, expressionEnd, function (expression, start) {
-      var trimmedExpression = expression.trim();
-      // FIXME: For start requires space after for, doesn't work with other
-      // whitespace characters. We should probably be regexing.
-      // Also, the ending expression is required to be exactly {{/for}}, with
-      // no whitespace or other oddities. Again, we should be regexing.
-      var forStatement = "for ";
-      if (trimmedExpression.indexOf(forStatement) === 0) {
-        var _loopSourceStart = start + expression.length + expressionEnd.length;
-        var loopEndExpression = expressionStart + "/for" + expressionEnd;
-        var loopSourceEnd = source.indexOf(loopEndExpression, start);
-        if (loopSourceEnd === -1) {
-          console.error("Mismatched for loop start");
-          return [source, _loopSourceStart];
-        }
-
-        var loopSource = source.substring(_loopSourceStart, loopSourceEnd);
-        var inExpression = " in ";
-        var inStart = trimmedExpression.indexOf(inExpression) + inExpression.length;
-        var loopContext = trimmedExpression.substring(inStart);
-        var varStart = trimmedExpression.indexOf(" ");
-        var varName = trimmedExpression.substring(varStart, trimmedExpression.indexOf(inExpression)).trim();
-
-        var iterable = function (e) {
-          return eval(e);
-        }.call(contextWithIndex, loopContext);
-
-        if (typeof iterable.length === "undefined") {
-          console.error("Invalid iterable passed to for");
-          return [source, _loopSourceStart];
-        }
-
-        var output = "";
-        for (var i = 0; i < iterable.length; i++) {
-          var iterationContext = {};
-          iterationContext[varName] = iterable[i];
-          output += HappyTemplate._compile(loopSource.trim(), iterationContext, i);
-        }
-
-        source = HappyTemplate._strSplice(source, start - expressionStart.length, loopSourceEnd - start + expressionStart.length + loopEndExpression.length, output);
-
-        return [source, start - expressionStart.length + output.length];
-      }
-
-      var ifStatement = "if ";
-      if (trimmedExpression.indexOf(ifStatement) === 0) {
-        var conditionalSourceStart = start + expression.length + expressionEnd.length;
-        var conditionalEndExpression = expressionStart + "/if" + expressionEnd;
-        var conditionalSourceEnd = source.indexOf(conditionalEndExpression, start);
-        if (conditionalSourceEnd === -1) {
-          console.error("Mismatched conditional statement");
-          return [source, loopSourceStart];
-        }
-
-        var conditionalSource = source.substring(conditionalSourceStart, conditionalSourceEnd);
-        var conditional = trimmedExpression.substring(trimmedExpression.indexOf(ifStatement) + ifStatement.length).trim();
-
-        var evaluation = function (e) {
-          return Boolean(eval(e));
-        }.call(contextWithIndex, conditional);
-
-        if (!evaluation) {
-          var startIndex = start - expressionStart.length;
-          source = HappyTemplate._strSplice(source, startIndex, conditionalSourceEnd + conditionalEndExpression.length - startIndex);
-          return [source, startIndex];
-        }
-
-        var _output = HappyTemplate._compile(conditionalSource.trim(), context);
-        source = HappyTemplate._strSplice(source, start - expressionStart.length, conditionalSourceEnd - start + expressionStart.length + conditionalEndExpression.length, _output);
-
-        return [source, start - expressionStart.length + _output.length];
-      }
-
-      var result = function (e) {
-        return eval(e);
-      }.call(contextWithIndex, expression);
-
-      if (typeof result === "undefined") {
-        return [source, start + expression.length + expressionEnd.length + expressionStart.length];
-      } else {
-        result = String(result);
-        source = source.replace("" + expressionStart + expression + expressionEnd, result);
-        return [source, start - expressionStart.length + result.length];
-      }
-    });
-
-    return source;
-  },
-
-  render: function render(templateId, context, targetElement, index) {
-    var _this2 = this;
-
-    if (!this.documentObject) {
-      this.documentObject = window.document;
-    }
-    var markup = "";
-
-    var templateElement = this.documentObject.getElementById(templateId);
-    if (!templateElement || typeof templateElement.innerHTML !== "string") {
-      console.error("Invalid template id specified: " + templateId);
-      if (process && process.exit) {
-        process.exit();
-      }
-
-      return "";
-    }
-    var source = templateElement.innerHTML;
-
-    if (Array.isArray(context)) {
-      var items = context.map(function (data, index) {
-        return _this2._compile(source, data, index);
-      });
-
-      markup = items.join("\n");
+    if (!lazyImages._imgElements) {
+      lazyImages._imgElements = fiso.querySelectorAllCached("img[data-src]");
     } else {
-      markup = this._compile(source, context, index);
+      if (lazyImages._lazyCacheList.length === lazyImages._imgElements.length) {
+        lazyImages._allLoaded = true;
+        return;
+      }
     }
 
-    if (targetElement) {
-      targetElement.innerHTML = markup;
-    }
+    var _imgElements = lazyImages._imgElements;
 
-    return markup;
+    for (var i = 0; i < _imgElements.length; i++) {
+      if (lazyImages._lazyCache[i]) {
+        continue;
+      }
+      var el = _imgElements[i];
+      if (!fiso.elementInView(el)) {
+        continue;
+      }
+      lazyImages._lazyCache[i] = true;
+      lazyImages._lazyCacheList = Object.keys(lazyImages._lazyCache);
+
+      el.addEventListener("load", lazyImages._onLoad);
+      el.addEventListener("error", lazyImages._onError);
+      el.classList.add("loading");
+      el.src = el.dataset.src;
+      delete el.dataset.src;
+    }
   }
 };
-
-if (typeof module !== "undefined") {
-  module.exports = HappyTemplate;
-}
 'use strict';
 
 // https://tc39.github.io/ecma262/#sec-array.prototype.find
